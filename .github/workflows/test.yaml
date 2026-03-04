@@ -29,4 +29,4 @@ jobs:
         with:
           source_tag: ${{ inputs.source_tag }}
           new_tag:    ${{ inputs.new_tag }}
-          repository: "my-app"
+          repository: "lasius-application-gateway"
