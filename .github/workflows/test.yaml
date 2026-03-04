@@ -25,7 +25,7 @@ jobs:
           aws-region: us-east-1
 
       - name: Run retag action
-        uses: sujatadhl/retag-ecr-action@main   
+        uses: sujatadhl/retag-and-push-ECR-image@main   
         with:
           source_tag: ${{ inputs.source_tag }}
           new_tag:    ${{ inputs.new_tag }}
