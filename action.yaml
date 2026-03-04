@@ -1,0 +1,93 @@
+name: "Retag & Push ECR Image"
+description: "Pull an existing Amazon ECR image by tag, apply a new tag, and push it back — no re-build required."
+author: "your-github-username"
+
+branding:
+  icon: "tag"
+  color: "orange"
+
+inputs:
+  source_tag:
+    description: "The existing image tag to pull from ECR (e.g. sha-abc1234)"
+    required: true
+
+  new_tag:
+    description: "The new tag to apply and push (e.g. v1.2.3 or latest)"
+    required: true
+
+  repository:
+    description: "ECR repository name (e.g. my-app)"
+    required: true
+
+  aws_region:
+    description: "AWS region where the ECR registry lives"
+    required: false
+    default: "us-east-1"
+
+  push_latest:
+    description: "Also push a 'latest' tag alongside the new tag (true/false)"
+    required: false
+    default: "false"
+
+outputs:
+  image:
+    description: "Full URI of the newly tagged image (registry/repo:tag)"
+    value: ${{ steps.retag.outputs.image }}
+
+  registry:
+    description: "ECR registry URI (without repo or tag)"
+    value: ${{ steps.login-ecr.outputs.registry }}
+
+runs:
+  using: "composite"
+  steps:
+    # ── 1. Login to ECR ────────────────────────────────────────────────────────
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    # ── 2. Retag & push ────────────────────────────────────────────────────────
+    - name: Retag and push image
+      id: retag
+      shell: bash
+      env:
+        REGISTRY:    ${{ steps.login-ecr.outputs.registry }}
+        REPOSITORY:  ${{ inputs.repository }}
+        SOURCE_TAG:  ${{ inputs.source_tag }}
+        NEW_TAG:     ${{ inputs.new_tag }}
+        PUSH_LATEST: ${{ inputs.push_latest }}
+      run: |
+        SOURCE_IMAGE="$REGISTRY/$REPOSITORY:$SOURCE_TAG"
+        TARGET_IMAGE="$REGISTRY/$REPOSITORY:$NEW_TAG"
+
+        echo "::group::Pull source image"
+        echo "Pulling: $SOURCE_IMAGE"
+        docker pull "$SOURCE_IMAGE"
+        echo "::endgroup::"
+
+        echo "::group::Retag and push"
+        docker tag "$SOURCE_IMAGE" "$TARGET_IMAGE"
+        docker push "$TARGET_IMAGE"
+        echo "✅ Pushed: $TARGET_IMAGE"
+
+        if [ "$PUSH_LATEST" = "true" ]; then
+          LATEST_IMAGE="$REGISTRY/$REPOSITORY:latest"
+          docker tag "$SOURCE_IMAGE" "$LATEST_IMAGE"
+          docker push "$LATEST_IMAGE"
+          echo "✅ Pushed: $LATEST_IMAGE"
+        fi
+        echo "::endgroup::"
+
+        echo "image=$TARGET_IMAGE" >> $GITHUB_OUTPUT
+
+    # ── 3. Job summary ─────────────────────────────────────────────────────────
+    - name: Write job summary
+      shell: bash
+      run: |
+        echo "## 🐳 ECR Retag Summary" >> $GITHUB_STEP_SUMMARY
+        echo "| | |" >> $GITHUB_STEP_SUMMARY
+        echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+        echo "| **Repository** | \`${{ inputs.repository }}\` |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Source tag** | \`${{ inputs.source_tag }}\` |" >> $GITHUB_STEP_SUMMARY
+        echo "| **New tag** | \`${{ inputs.new_tag }}\` |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Full image** | \`${{ steps.retag.outputs.image }}\` |" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,45 @@
+name: Example — Promote ECR Image
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      source_tag:
+        description: "Source image tag (e.g. sha-abc1234)"
+        required: true
+      new_tag:
+        description: "New tag to apply (e.g. v1.2.3)"
+        required: true
+      repository:
+        description: "ECR repository name"
+        required: true
+        default: "my-app"
+
+jobs:
+  retag:
+    name: Retag ECR Image
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # required for OIDC
+      contents: read
+
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Retag and push ECR image
+        id: retag
+        uses: your-github-username/retag-ecr-action@v1
+        with:
+          source_tag:  ${{ inputs.source_tag || format('sha-{0}', github.sha) }}
+          new_tag:     ${{ inputs.new_tag || github.ref_name }}
+          repository:  ${{ inputs.repository || 'my-app' }}
+          push_latest: "true"
+
+      - name: Use the output image URI
+        run: echo "Deployed image → ${{ steps.retag.outputs.image }}"
