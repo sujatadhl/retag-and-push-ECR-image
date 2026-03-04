@@ -1,0 +1,32 @@
+name: Test ECR Retag Action
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_tag:
+        description: "Source tag"
+        required: true
+      new_tag:
+        description: "New tag"
+        required: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Run retag action
+        uses: sujatadhl/retag-ecr-action@main   
+        with:
+          source_tag: ${{ inputs.source_tag }}
+          new_tag:    ${{ inputs.new_tag }}
+          repository: "my-app"
